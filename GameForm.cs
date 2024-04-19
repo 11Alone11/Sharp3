@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -29,8 +30,8 @@ namespace WindowsFormsApp1
         private List<Point> traps; // Хранит позиции ловушек
 
         private const int CellSize = 50;
-        private const int GridWidth = 6;
-        private const int GridHeight = 6;
+        private const int GridWidth = 20;
+        private const int GridHeight = 20;
 
         private Image rabbitImage;
         private Image carrotImage;
@@ -48,20 +49,18 @@ namespace WindowsFormsApp1
 
             rabbitPosition = new Point(100, 100);
 
+            LoadResources();
+            CreateBackgroundBuffer();
             InitializeLevel();
             this.KeyDown += new KeyEventHandler(GameForm_KeyDown);
-
         }
+
+
 
         private void InitializeLevel()
         {
             isGameRunning = true;
             rabbitPosition = new Point(250, 200);
-
-            rabbitImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Rabbit3.png");
-            carrotImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Carrot4.png");
-            cellBackgroundImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Grass2.png");
-            trapImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Trap.png");
 
             carrots = new List<Rectangle>();
 
@@ -92,35 +91,63 @@ namespace WindowsFormsApp1
 
         }
 
-       
+        private Bitmap backgroundBuffer;
+
+
+        private void CreateBackgroundBuffer()
+        {
+            if (backgroundBuffer != null)
+                backgroundBuffer.Dispose();
+
+            backgroundBuffer = new Bitmap(CellSize * GridWidth, CellSize * GridHeight);
+            using (Graphics g = Graphics.FromImage(backgroundBuffer))
+            {
+                for (int i = 0; i < GridWidth; i++)
+                {
+                    for (int j = 0; j < GridHeight; j++)
+                    {
+                        g.DrawImage(cellBackgroundImage, i * CellSize, j * CellSize, CellSize, CellSize);
+                    }
+                }
+            }
+        }
+
+
+
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
             Graphics g = e.Graphics;
 
-            // Сначала рисуем фон для каждой клетки.
-            for (int i = 0; i < GridWidth; i++)
+            // Отрисовка сохраненного фона из буфера
+            g.DrawImage(backgroundBuffer, 0, 0);
+
+            // Отрисовка морковок и ловушек в области, требующей перерисовки
+            foreach (var carrot in carrots)
             {
-                for (int j = 0; j < GridHeight; j++)
+                if (e.ClipRectangle.IntersectsWith(new Rectangle(carrot.X, carrot.Y, CellSize, CellSize)))
                 {
-                    g.DrawImage(cellBackgroundImage, i * CellSize, j * CellSize, CellSize, CellSize);
+                    DrawCarrot(g, carrot.X, carrot.Y);
                 }
             }
 
             foreach (Point trap in traps)
             {
-                DrawTrap(e.Graphics, trap.X, trap.Y);
+                if (e.ClipRectangle.IntersectsWith(new Rectangle(trap.X, trap.Y, CellSize, CellSize)))
+                {
+                    DrawTrap(g, trap.X, trap.Y);
+                }
             }
 
-            // Затем рисуем морковки.
-            foreach (var carrot in carrots)
+            // Отрисовка кролика, если его позиция пересекается с областью перерисовки
+            if (e.ClipRectangle.IntersectsWith(new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize)))
             {
-                DrawCarrot(g, carrot.X, carrot.Y);
+                DrawRabbit(g, rabbitPosition.X, rabbitPosition.Y);
             }
-
-            // В конце рисуем зайца.
-            DrawRabbit(g, rabbitPosition.X, rabbitPosition.Y);
         }
+
+
 
         private void DrawTrap(Graphics g, int x, int y)
         {
@@ -132,7 +159,7 @@ namespace WindowsFormsApp1
             StartGame();
         }
 
-        private void GameForm_KeyDown(object sender, KeyEventArgs e)
+        private async  void GameForm_KeyDown(object sender, KeyEventArgs e)
         {
             if (!isGameRunning || isMoving) return; // Игнорируем ввод, если игра остановлена или идёт анимация
 
@@ -153,16 +180,54 @@ namespace WindowsFormsApp1
                     break;
             }
 
+            // Проверка, находится ли новая позиция в пределах игрового поля и нет ли там ловушки
             if (newRabbitPosition.X >= 0 && newRabbitPosition.X < CellSize * GridWidth &&
-                newRabbitPosition.Y >= 0 && newRabbitPosition.Y < CellSize * GridHeight &&
-                !isMoving) // Проверяем, что анимация не выполняется
+         newRabbitPosition.Y >= 0 && newRabbitPosition.Y < CellSize * GridHeight)
             {
+                if (!isMoving) // Проверяем, что анимация не выполняется
+                {
+                    startPosition = rabbitPosition;
+                    targetRabbitPosition = newRabbitPosition;
+                    moveStartTime = DateTime.Now;
+                    isMoving = true; // Запускаем анимацию
+
+                    // Проверяем, находится ли на новой позиции ловушка
+                    if (traps.Any(trap => trap.X == newRabbitPosition.X && trap.Y == newRabbitPosition.Y))
+                    {
+                        rabbitPosition = targetRabbitPosition; // Перемещаем кролика на клетку с ловушкой
+                        Task.Delay(moveDuration).ContinueWith(t => GameOver()); // Задержка перед вызовом GameOver
+                        return;
+                    }
+                }
+            }
+
+            if (traps.Any(trap => trap.X == newRabbitPosition.X && trap.Y == newRabbitPosition.Y))
+            {
+                // Перемещаем кролика на клетку с ловушкой
+                targetRabbitPosition = newRabbitPosition;
+                isMoving = true;
+                moveStartTime = DateTime.Now;
+                startPosition = rabbitPosition;
+            }
+            else if (!isMoving && newRabbitPosition.X >= 0 && newRabbitPosition.X < CellSize * GridWidth &&
+         newRabbitPosition.Y >= 0 && newRabbitPosition.Y < CellSize * GridHeight)
+            {
+                // Начинаем движение
                 startPosition = rabbitPosition;
                 targetRabbitPosition = newRabbitPosition;
                 moveStartTime = DateTime.Now;
-                isMoving = true; // Запускаем анимацию
+                isMoving = true;
             }
         }
+
+        private void LoadResources()
+        {
+            rabbitImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Rabbit3.png");
+            carrotImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Carrot4.png");
+            cellBackgroundImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Grass2.png");
+            trapImage = Image.FromFile("D:\\C#3\\WindowsFormsApp1\\Properties\\Trap.png");
+        }
+
 
 
         private void WinGame()
@@ -206,6 +271,9 @@ namespace WindowsFormsApp1
                 Thread.Sleep(100); // Проверка каждые 100 миллисекунд
             }
         }
+        private bool gameIsOver = false;
+
+
 
         private void RabbitMovement()
         {
@@ -219,7 +287,6 @@ namespace WindowsFormsApp1
                         var elapsed = (currentTime - moveStartTime).TotalMilliseconds;
                         if (elapsed < moveDuration)
                         {
-                            // Плавное перемещение зайца
                             double t = elapsed / moveDuration;
                             rabbitPosition = new Point(
                                 startPosition.X + (int)((targetRabbitPosition.X - startPosition.X) * t),
@@ -228,16 +295,34 @@ namespace WindowsFormsApp1
                         }
                         else
                         {
-                            // Убедимся, что заяц в конечном итоге оказывается в центре клетки
                             rabbitPosition = targetRabbitPosition;
-                            isMoving = false; // Движение завершено
+                            isMoving = false;
+
+                            // Проверяем, остановился ли кролик на ловушке и заканчиваем игру
+                            if (traps.Any(trap => trap.X == rabbitPosition.X && trap.Y == rabbitPosition.Y))
+                            {
+                                Invoke((MethodInvoker)GameOver);
+                            }
                         }
+
+                        if (!isMoving)
+                        {
+                            // Если кролик наступил на ловушку, останавливаем игру.
+                            if (traps.Any(trap => trap.X == rabbitPosition.X && trap.Y == rabbitPosition.Y))
+                            {
+                                GameOver();
+                            }
+                        }
+
                         Invalidate(); // Перерисовка формы
+
                     });
+                    Thread.Sleep(10);
                 }
-                Thread.Sleep(10); // Для плавности анимации
             }
         }
+
+
 
 
         private void CheckCarrot()
@@ -288,15 +373,21 @@ namespace WindowsFormsApp1
 
         private void GameOver()
         {
+            if (gameIsOver) return;
+
             if (InvokeRequired)
             {
                 Invoke((MethodInvoker)delegate { GameOver(); });
                 return;
             }
+
+            gameIsOver = true;
+            isMoving = false;
             isGameRunning = false;
             MessageBox.Show("К сожалению, игра закончена. Вы наступили на ловушку!");
             Close();
         }
+
 
         private void DrawRabbit(Graphics g, int x, int y)
         {
