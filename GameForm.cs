@@ -96,8 +96,8 @@ namespace WindowsFormsApp1
         private List<Point> traps; // Хранит позиции ловушек
 
         private const int CellSize = 100; // Размер ячейки
-        private const int GridWidth = 5; // Ширина ячейки
-        private const int GridHeight = 5; // Высота ячейки
+        private const int GridWidth = 10; // Ширина ячейки
+        private const int GridHeight = 6; // Высота ячейки
 
         private Bitmap backgroundBuffer; // Фон глобальный
 
@@ -317,7 +317,9 @@ namespace WindowsFormsApp1
 
             trapThread = new Thread(TrapBehavior) { IsBackground = true };
             trapThread.Start();
-            wolfThread = new Thread(WolfAction) { IsBackground = true };
+            
+
+
         }
 
         private void TrapBehavior()
@@ -344,6 +346,7 @@ namespace WindowsFormsApp1
                         if (WolfRect.IntersectsWith(TrapRect))
                         {
                             Wolf.HP -= 50;
+                            traps.RemoveAt(i);
                             Invalidate(TrapRect);
                             Thread.Sleep(50);
                         }
@@ -482,10 +485,11 @@ namespace WindowsFormsApp1
                     await Task.Delay(150);
                     WinGame();
                 }                
-                if (carrots.Count < 5 && !WolfFlag || carrots.Count < 5 && WolfDead && WolfFlag)
+                if (carrots.Count < 10 && !WolfFlag || carrots.Count < 10 && WolfFlag && WolfDead)//|| carrots.Count < 5 && WolfDead && WolfFlag
                 {
                     Wolf = new Wolf(new Point(0,0));
                     WolfFlag = true;
+                    wolfThread = new Thread(WolfAction) { IsBackground = true };
                     wolfThread.Start();
                 }
             }
@@ -536,7 +540,7 @@ namespace WindowsFormsApp1
                     {
                         droped = true;
                         carrots.RemoveAt(i);
-                        Invalidate(WolfRect);
+                        Invalidate(carrots[i]);
                     }
                 }
 
