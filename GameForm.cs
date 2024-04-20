@@ -482,7 +482,7 @@ namespace WindowsFormsApp1
                     await Task.Delay(150);
                     WinGame();
                 }                
-                if (carrots.Count < 5 && !WolfFlag)
+                if (carrots.Count < 5 && !WolfFlag || carrots.Count < 5 && WolfDead && WolfFlag)
                 {
                     Wolf = new Wolf(new Point(0,0));
                     WolfFlag = true;
