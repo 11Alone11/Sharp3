@@ -60,12 +60,12 @@ namespace WindowsFormsApp1
                         if (this.SmellField[neighborX, neighborY] > maxSmell)
                         {
                             maxSmell = this.SmellField[neighborX, neighborY];
-                            maxSmellPosition = new Point(neighborX + neighborX* CellSize, neighborY + neighborY* CellSize);
+                            maxSmellPosition = new Point(neighborX * CellSize, neighborY * CellSize);
                         }
                     }
                 }
             }
-            
+
             return maxSmellPosition;
         }
 
@@ -109,127 +109,162 @@ namespace WindowsFormsApp1
 
         private bool gameIsOver = false; // Проиграна ли игра
 
+        public bool WolfFlag = false;
+        bool WolfDead = false;
+        int WolfTrigger = 100;
 
 
 
         public GameForm()
         {
-            InitializeComponent(); // Инициализация компонентов
-            this.DoubleBuffered = true; // ?
-            this.ClientSize = new Size(CellSize * GridWidth, CellSize * GridHeight); // Размер главной формы
-            this.Text = "Собери всю морковку";
-            cancellationTokenSource = new CancellationTokenSource(); //?
+            try
+            {
+                InitializeComponent(); // Инициализация компонентов
+                this.DoubleBuffered = true;
+                this.ClientSize = new Size(CellSize * GridWidth, CellSize * GridHeight); // Размер главной формы
+                this.Text = "Собери всю морковку";
+                cancellationTokenSource = new CancellationTokenSource();
 
-            rabbitPosition = new Point(100, 100);  // Позиция кролика
+                rabbitPosition = new Point(100, 100);  // Позиция кролика
 
 
-            Wolf.height = GridHeight;
-            Wolf.width = GridWidth;
-            Wolf.CellSize = CellSize;
-            LoadResources(); // Загрузка ресурсов
-            CreateBackgroundBuffer(); //?
-            InitializeLevel(); // Инициализация уровня
-            this.KeyDown += new KeyEventHandler(GameForm_KeyDown); // Нажата кнопка в форме
+                Wolf.height = GridHeight;
+                Wolf.width = GridWidth;
+                Wolf.CellSize = CellSize;
+                LoadResources(); // Загрузка ресурсов
+                CreateBackgroundBuffer();
+                InitializeLevel(); // Инициализация уровня
+                this.KeyDown += new KeyEventHandler(GameForm_KeyDown); // Нажата кнопка в форме}
+            }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Формы игры");
+            }
         }
 
 
 
         private void InitializeLevel()
         {
-            isGameRunning = true;    
-            rabbitPosition = new Point(200, 200);// Смена позиции кролика с 100 100 в 250 200 зачем?
-
-            carrots = new List<Rectangle>(); // Список морквы
-
-            for (int i = 0; i < GridHeight; i++) // Заполнение списока морквы
+            try
             {
-                for (int j = 0; j < GridWidth; j++)
+                isGameRunning = true;
+                //PAO 26.04.24
+                //rabbitPosition = new Point(200, 200);// Смена позиции кролика с 100 100 в 250 200 зачем?
+
+                carrots = new List<Rectangle>(); // Список морквы
+
+                for (int i = 0; i < GridHeight; i++) // Заполнение списока морквы
                 {
-                    if ((i + j) % 2 == 0)
+                    for (int j = 0; j < GridWidth; j++)
                     {
-                        carrots.Add(new Rectangle(j * CellSize, i * CellSize, CellSize, CellSize));
+                        if ((i + j) % 2 == 0)
+                        {
+                            carrots.Add(new Rectangle(j * CellSize, i * CellSize, CellSize, CellSize));
+                        }
+                    }
+                }
+
+                traps = new List<Point>();
+                Random random = new Random();
+                int maxTrapsCount = 4;// random.Next(4, Math.Max(GridWidth, GridHeight));
+                while (traps.Count < maxTrapsCount)
+                {
+                    Point trapPosition = new Point(random.Next(0, GridWidth) * CellSize, random.Next(0, GridHeight) * CellSize);
+                    // Проверка, что ловушка не находится в той же позиции, что и морковка или кролик
+                    if (!traps.Contains(trapPosition) &&
+                        !carrots.Exists(c => c.Contains(trapPosition)) &&
+                        trapPosition != rabbitPosition)
+                    {
+                        traps.Add(trapPosition);
                     }
                 }
             }
-
-            traps = new List<Point>(); 
-            Random random = new Random();
-            int maxTrapsCount = 4;// random.Next(4, Math.Max(GridWidth, GridHeight));
-            while (traps.Count < maxTrapsCount)
+            catch (Exception a)
             {
-                Point trapPosition = new Point(random.Next(0, GridWidth) * CellSize, random.Next(0, GridHeight) * CellSize);
-                // Проверка, что ловушка не находится в той же позиции, что и морковка или кролик
-                if (!traps.Contains(trapPosition) &&
-                    !carrots.Exists(c => c.Contains(trapPosition)) &&
-                    trapPosition != rabbitPosition)
-                {
-                    traps.Add(trapPosition);
-                }
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Инициализации");
             }
-
         }
 
 
         private void CreateBackgroundBuffer()  // отрисовка фона
         {
-            if (backgroundBuffer != null)
+            try
             {
-                backgroundBuffer.Dispose(); // Очистка памяти занятым главным фоном
-            }
-
-            backgroundBuffer = new Bitmap(CellSize * GridWidth, CellSize * GridHeight); // Создание буфера
-            using (Graphics g = Graphics.FromImage(backgroundBuffer))
-            {
-                for (int i = 0; i < GridWidth; i++)
+                // Очистка памяти занятым главным фоном
+                if (backgroundBuffer != null)
                 {
-                    for (int j = 0; j < GridHeight; j++)
+                    backgroundBuffer.Dispose();
+                }
+
+                // Создание буфера
+                backgroundBuffer = new Bitmap(CellSize * GridWidth, CellSize * GridHeight);
+                using (Graphics g = Graphics.FromImage(backgroundBuffer))
+                {
+                    for (int i = 0; i < GridWidth; i++)
                     {
-                        g.DrawImage(cellBackgroundImage, i * CellSize, j * CellSize, CellSize, CellSize); // Отрисовка ij ячейки
+                        for (int j = 0; j < GridHeight; j++)
+                        {
+                            // Отрисовка ij ячейки
+                            g.DrawImage(cellBackgroundImage, i * CellSize, j * CellSize, CellSize, CellSize);
+                        }
                     }
                 }
             }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Фона");
+            }
         }
 
-        public bool WolfFlag = false;
         protected override void OnPaint(PaintEventArgs e)
         {
-            base.OnPaint(e);
-            Graphics g = e.Graphics;
-
-            g.DrawImage(backgroundBuffer, 0, 0);// Отрисовка сохраненного фона из буфера
-            foreach (Point trap in traps)
+            try
             {
-                if (e.ClipRectangle.IntersectsWith(new Rectangle(trap.X, trap.Y, CellSize, CellSize)))
+                base.OnPaint(e);
+                Graphics g = e.Graphics;
+
+                // Отрисовка сохраненного фона из буфера
+                g.DrawImage(backgroundBuffer, 0, 0);
+                foreach (Point trap in traps.ToList())
                 {
-                    DrawTrap(g, trap.X, trap.Y);
+                    if (e.ClipRectangle.IntersectsWith(new Rectangle(trap.X, trap.Y, CellSize, CellSize)))
+                    {
+                        DrawTrap(g, trap.X, trap.Y);
+                    }
                 }
-            }
 
-             
-            
-
-            // Отрисовка морковок и ловушек в области, требующей перерисовки
-            foreach (var carrot in carrots)
-            {
-                if (e.ClipRectangle.IntersectsWith(new Rectangle(carrot.X, carrot.Y, CellSize, CellSize)))
+                // Отрисовка морковок и ловушек в области, требующей перерисовки
+                foreach (var carrot in carrots.ToList())
                 {
-                    DrawCarrot(g, carrot.X, carrot.Y);
+                    if (e.ClipRectangle.IntersectsWith(new Rectangle(carrot.X, carrot.Y, CellSize, CellSize)))
+                    {
+                        DrawCarrot(g, carrot.X, carrot.Y);
+                    }
                 }
-            }
 
-            if (WolfFlag && !WolfDead)
-            {
+                // Отрисовка кролика, если его позиция пересекается с областью перерисовки
+                if (e.ClipRectangle.IntersectsWith(new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize)))
+                {
+                    DrawRabbit(g, rabbitPosition.X, rabbitPosition.Y);
+                }
+
                 // Отрисовка волка, если его позиция пересекается с областью перерисовки
-                if (e.ClipRectangle.IntersectsWith(new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize)))
+                if (WolfFlag && !WolfDead)
                 {
-                    DrawWolf(g, Wolf.WolfPosition.X, Wolf.WolfPosition.Y);
+                    if (e.ClipRectangle.IntersectsWith(new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize)))
+                    {
+                        DrawWolf(g, Wolf.WolfPosition.X, Wolf.WolfPosition.Y);
+                    }
                 }
             }
-
-            // Отрисовка кролика, если его позиция пересекается с областью перерисовки
-            if (e.ClipRectangle.IntersectsWith(new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize)))
+            catch (Exception a)
             {
-                DrawRabbit(g, rabbitPosition.X, rabbitPosition.Y);
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Отрисовки");
             }
         }
 
@@ -245,45 +280,74 @@ namespace WindowsFormsApp1
             StartGame();  // начало игры
         }
 
-        private async  void GameForm_KeyDown(object sender, KeyEventArgs e)
+        private void GameForm_KeyDown(object sender, KeyEventArgs e)
         {
-            if (!isGameRunning || isMoving) return; // Игнорируем ввод, если игра остановлена или идёт анимация
-
-            var newRabbitPosition = rabbitPosition; // Частичное переопределение позиции
-            switch (e.KeyCode)
+            try
             {
-                case Keys.Up:
-                    newRabbitPosition.Y -= CellSize;
-                    break;
-                case Keys.Down:
-                    newRabbitPosition.Y += CellSize;
-                    break;
-                case Keys.Left:
-                    newRabbitPosition.X -= CellSize;
-                    break;
-                case Keys.Right:
-                    newRabbitPosition.X += CellSize;
-                    break;
-            }
+                if (!isGameRunning || isMoving) return; // Игнорируем ввод, если игра остановлена или идёт анимация
 
-            // Проверка, находится ли новая позиция в пределах игрового поля и нет ли там ловушки
-            if (newRabbitPosition.X >= 0 && newRabbitPosition.X < CellSize * GridWidth &&
-            newRabbitPosition.Y >= 0 && newRabbitPosition.Y < CellSize * GridHeight)
-            {
-                if (!isMoving) // Проверяем, что анимация не выполняется
+                var newRabbitPosition = rabbitPosition; // Частичное переопределение позиции
+                switch (e.KeyCode)
                 {
-                    startPosition = rabbitPosition;
-                    targetRabbitPosition = newRabbitPosition;
-                    moveStartTime = DateTime.Now;
-                    isMoving = true; // Запускаем анимацию
+                    case Keys.Up:
+                        newRabbitPosition.Y -= CellSize;
+                        break;
+                    case Keys.Down:
+                        newRabbitPosition.Y += CellSize;
+                        break;
+                    case Keys.Left:
+                        newRabbitPosition.X -= CellSize;
+                        break;
+                    case Keys.Right:
+                        newRabbitPosition.X += CellSize;
+                        break;
+                    case Keys.W:
+                        newRabbitPosition.Y -= CellSize;
+                        break;
+                    case Keys.S:
+                        newRabbitPosition.Y += CellSize;
+                        break;
+                    case Keys.A:
+                        newRabbitPosition.X -= CellSize;
+                        break;
+                    case Keys.D:
+                        newRabbitPosition.X += CellSize;
+                        break;
+                }
+
+                // Проверка, находится ли новая позиция в пределах игрового поля и нет ли там ловушки
+                if (newRabbitPosition.X >= 0 && newRabbitPosition.X < CellSize * GridWidth &&
+                newRabbitPosition.Y >= 0 && newRabbitPosition.Y < CellSize * GridHeight)
+                {
+                    if (!isMoving) // Проверяем, что анимация не выполняется
+                    {
+                        startPosition = rabbitPosition;
+                        targetRabbitPosition = newRabbitPosition;
+                        moveStartTime = DateTime.Now;
+                        isMoving = true; // Запускаем анимацию
+                    }
+                }
+                if (WolfFlag)
+                {
+
+                    /*
+                    Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
+                    Rectangle RabbRect = new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize);
+                    if (WolfRect.IntersectsWith(RabbRect))
+                    {
+                        Wolf.WolfPosition = new Point(rabbitPosition.X, rabbitPosition.Y);
+                        Invoke((MethodInvoker)GameOver);
+                    }
+                    Invalidate(WolfRect);
+
+                     */
                 }
             }
-            if (WolfFlag)
+            catch (Exception a)
             {
-                //MessageBox.Show($"X: {Wolf.WolfPosition.X}, Y: {Wolf.WolfPosition.Y}.");
-
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Управления");
             }
-
         }
 
         private void LoadResources()
@@ -299,67 +363,106 @@ namespace WindowsFormsApp1
 
         private void WinGame()
         {
+
             isGameRunning = false;
-            MessageBox.Show("Вы выиграли! Все морковки собраны.");
-            Close();
+            rabbitThread.Abort();
+            carrotThread.Abort();
+            trapThread.Abort();
+            if (WolfFlag)
+            {
+                wolfThread.Abort();
+            }
+            Invoke((MethodInvoker)delegate
+            {
+                MessageBox.Show("Вы выиграли! Все морковки собраны.");
+                Close();
+            });
+
+
+            /*
+             try {
+             }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Победы");
+            }
+             */
         }
 
 
         private void StartGame()
         {
-            isGameRunning = true;
+            try
+            {
+                isGameRunning = true;
 
-            rabbitThread = new Thread(RabbitMovement) { IsBackground = true };
-            carrotThread = new Thread(CheckCarrot) { IsBackground = true };
+                rabbitThread = new Thread(RabbitMovement) { IsBackground = true };
+                carrotThread = new Thread(CheckCarrot) { IsBackground = true };
 
-            rabbitThread.Start();
-            carrotThread.Start();
+                rabbitThread.Start();
+                carrotThread.Start();
 
-            trapThread = new Thread(TrapBehavior) { IsBackground = true };
-            trapThread.Start();
-            
+                trapThread = new Thread(TrapBehavior) { IsBackground = true };
+                trapThread.Start();
+            }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+            }
 
 
         }
 
         private void TrapBehavior()
         {
-            while (isGameRunning && !cancellationTokenSource.IsCancellationRequested)
+            try
             {
-                lock (syncLock)
+                while (isGameRunning && !cancellationTokenSource.IsCancellationRequested)
                 {
-                    foreach (Point trap in traps)
+                    lock (syncLock)
                     {
-                        if (rabbitPosition == trap)
+                        foreach (Point trap in traps.ToList())
                         {
-                            Invoke((MethodInvoker)GameOver);
-                            return; // Завершаем поток, так как кролик пойман в ловушку
+                            if (rabbitPosition == trap)
+                            {
+                                Invoke((MethodInvoker)GameOver);
+                                return; // Завершаем поток, так как кролик пойман в ловушку
+                            }
                         }
                     }
-                }
-                if (WolfFlag)
-                {
-                    for (int i = traps.Count - 1; i >= 0; i--)
+                    if (WolfFlag)
                     {
-                        Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
-                        Rectangle TrapRect = new Rectangle(traps[i].X, traps[i].Y, CellSize, CellSize);
-                        if (WolfRect.IntersectsWith(TrapRect))
+                        for (int i = traps.Count - 1; i >= 0; i--)
                         {
-                            Wolf.HP -= 50;
-                            traps.RemoveAt(i);
-                            Invalidate(TrapRect);
-                            Thread.Sleep(50);
+                            if (i < traps.Count && traps.Count >= 0)
+                            {
+                                Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
+                                Rectangle TrapRect = new Rectangle(traps[i].X, traps[i].Y, CellSize, CellSize);
+                                if (WolfRect.IntersectsWith(TrapRect))
+                                {
+                                    Wolf.HP -= 500;
+                                    if (Wolf.HP < 0)
+                                    {
+                                        wolfThread.Abort();
+                                        Invalidate(WolfRect);
+                                        WolfDead = true;
+                                    }
+                                    traps.RemoveAt(i);
+                                    Thread.Sleep(2000);
+                                    Invalidate(TrapRect);
+                                    Invalidate(WolfRect);
+                                }
+                            }
                         }
                     }
-                    if (Wolf.HP < 0)
-                    {
-                        Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
-                        wolfThread.Abort();
-                        Invalidate(WolfRect);
-                        WolfDead = true;
-                    }
+                    Thread.Sleep(10);
                 }
-                Thread.Sleep(10);
+            }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Ловушки");
             }
         }
 
@@ -369,65 +472,79 @@ namespace WindowsFormsApp1
 
         private void RabbitMovement()
         {
-            while (isGameRunning && !cancellationTokenSource.IsCancellationRequested)
+            try
             {
-                if (isMoving)
+                while (isGameRunning && !cancellationTokenSource.IsCancellationRequested)
                 {
-                    Invoke((MethodInvoker)delegate
+                    if (isMoving)
                     {
-                        var currentTime = DateTime.Now;
-                        var elapsed = (currentTime - moveStartTime).TotalMilliseconds;
-                        if (elapsed < moveDuration)
+                        Invoke((MethodInvoker)delegate
                         {
-                            double t = elapsed / moveDuration;
-                            Point oldRabbitPosition = rabbitPosition;
-                            rabbitPosition = new Point(
-                                startPosition.X + (int)((targetRabbitPosition.X - startPosition.X) * t),
-                                startPosition.Y + (int)((targetRabbitPosition.Y - startPosition.Y) * t)
-                            );
-                        }
-                        else
-                        {
-                            rabbitPosition = targetRabbitPosition;
-                            isMoving = false;
+                            var currentTime = DateTime.Now;
+                            var elapsed = (currentTime - moveStartTime).TotalMilliseconds;
+                            if (elapsed < moveDuration)
+                            {
+                                double t = elapsed / moveDuration;
+                                Point oldRabbitPosition = rabbitPosition;
+                                rabbitPosition = new Point(
+                                    startPosition.X + (int)((targetRabbitPosition.X - startPosition.X) * t),
+                                    startPosition.Y + (int)((targetRabbitPosition.Y - startPosition.Y) * t)
+                                );
+                            }
+                            else
+                            {
+                                rabbitPosition = targetRabbitPosition;
+                                isMoving = false;
 
-                        }
+                            }
 
-                        rabbitPositionHistory.Add(targetRabbitPosition);
-                        rabbitPositionHistory.Add(rabbitPosition);
+                            rabbitPositionHistory.Add(targetRabbitPosition);
+                            rabbitPositionHistory.Add(rabbitPosition);
 
-                        // Ограничение длины истории
-                        if (rabbitPositionHistory.Count > maxPositionHistoryLength)
+                            // Ограничение длины истории
+                            if (rabbitPositionHistory.Count > maxPositionHistoryLength)
+                            {
+                                rabbitPositionHistory.RemoveAt(0);
+                            }
+                            foreach (Point point in rabbitPositionHistory.ToList())
+                            {
+                                Rectangle dirtyRect = new Rectangle(point.X, point.Y, CellSize, CellSize);
+                                Invalidate(dirtyRect);
+                            }
+                            if (WolfFlag)
+                            {
+                                Wolf.RefillSmellField(rabbitPosition);
+                            }
+                        });
+                        if (WolfFlag && !WolfDead)
                         {
-                            rabbitPositionHistory.RemoveAt(0);
+                            Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
+                            Rectangle RabbitRect = new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize);
+                            if (WolfRect.IntersectsWith(RabbitRect))
+                            {
+                                Invalidate(RabbitRect);
+                                Invalidate(WolfRect);
+                                deadFromWolf = true;
+                                Invoke((MethodInvoker)GameOver);
+                                return;
+                            }
                         }
-                        foreach (Point point in rabbitPositionHistory)
+                        foreach (Point trap in traps.ToList())
                         {
-                            Rectangle dirtyRect = new Rectangle(point.X, point.Y, CellSize, CellSize);
-                            Invalidate(dirtyRect);
+                            if (rabbitPosition == trap)
+                            {
+                                Invoke((MethodInvoker)GameOver);
+                                return; // Завершаем поток, так как кролик пойман в ловушку
+                            }
                         }
-                        if (WolfFlag)
-                        {
-                            Wolf.RefillSmellField(rabbitPosition);
-                        }
-                    });
-                    if (WolfFlag && !WolfDead)
-                    {
-                        Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
-                        Rectangle RabbitRect = new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize);
-                        if (WolfRect.IntersectsWith(RabbitRect)) { Invoke((MethodInvoker)GameOver); return; }
-                        
+                        Thread.Sleep(10);
                     }
-                    foreach (Point trap in traps)
-                    {
-                        if (rabbitPosition == trap)
-                        {
-                            Invoke((MethodInvoker)GameOver);
-                            return; // Завершаем поток, так как кролик пойман в ловушку
-                        }
-                    }
-                    Thread.Sleep(10);
                 }
+            }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Кроля");
             }
         }
 
@@ -436,78 +553,128 @@ namespace WindowsFormsApp1
 
         private void CheckCarrot()
         {
-            while (isGameRunning && !cancellationTokenSource.IsCancellationRequested)
+            try
             {
-                Invoke((MethodInvoker)delegate
+                while (isGameRunning && !cancellationTokenSource.IsCancellationRequested)
                 {
-                    CheckRabbitCarrotCollision();
-                });
-                Thread.Sleep(10); //FV2
+                    Invoke((MethodInvoker)delegate
+                    {
+                        CheckRabbitCarrotCollision();
+                    });
+                    Thread.Sleep(10); //FV2
+                }
+            }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Проверки морковки");
             }
         }
 
-        bool WolfDead = false;
         private async void CheckRabbitCarrotCollision()
         {
-            Rectangle rabbitRectangle = new Rectangle(rabbitPosition, new Size(CellSize, CellSize));
-            bool eaten = false;
+            try
+            {
+                Rectangle rabbitRectangle = new Rectangle(rabbitPosition, new Size(CellSize, CellSize));
+                bool eaten = false;
 
-            for (int i = carrots.Count - 1; i >= 0; i--)
-            {
-                if (rabbitRectangle.IntersectsWith(carrots[i]))
-                {
-                    eaten = true;
-                    carrots.RemoveAt(i);
-                }
-                
-            }
-            if (WolfFlag)
-            {
                 for (int i = carrots.Count - 1; i >= 0; i--)
                 {
-                    Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
-                    if (WolfRect.IntersectsWith(carrots[i]))
+                    if (i < carrots.Count && carrots.Count >= 0)
                     {
-                        this.MoveDurationWolf += 500;
-                        if (MoveDurationWolf > 2000)
+                        if (rabbitRectangle.IntersectsWith(carrots[i]))
                         {
-                            wolfThread.Abort();
-                            Invalidate(WolfRect);
-                            WolfDead = true;
+                            eaten = true;
+                            carrots.RemoveAt(i);
                         }
                     }
                 }
-            }
-            if (eaten)
-            {
-                if (carrots.Count == 0)
+                if (WolfFlag)
                 {
-                    await Task.Delay(150);
-                    WinGame();
-                }                
-                if (carrots.Count < 10 && !WolfFlag || carrots.Count < 10 && WolfFlag && WolfDead)//|| carrots.Count < 5 && WolfDead && WolfFlag
+                    for (int i = carrots.Count - 1; i >= 0; i--)
+                    {
+                        if (i < carrots.Count && carrots.Count >= 0)
+                        {
+                            Rectangle WolfRect = new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize);
+                            if (WolfRect.IntersectsWith(carrots[i]))
+                            {
+                                this.MoveDurationWolf += 500;
+                                if (MoveDurationWolf > 2000)
+                                {
+                                    wolfThread.Abort();
+                                    Invalidate(WolfRect);
+                                    WolfDead = true;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (eaten)
                 {
-                    Wolf = new Wolf(new Point(0,0));
-                    WolfFlag = true;
-                    wolfThread = new Thread(WolfAction) { IsBackground = true };
-                    wolfThread.Start();
+                    if (carrots.Count == 0)
+                    {
+                        await Task.Delay(150);
+                        WinGame();
+                    }
+                    if (carrots.Count < WolfTrigger && !WolfFlag || carrots.Count < WolfTrigger && WolfFlag && WolfDead)//|| carrots.Count < 5 && WolfDead && WolfFlag
+                    {
+                        bool SpawnFlag = true;
+                        Point WolfPoint = new Point(random.Next(0, GridWidth) * CellSize, random.Next(0, GridHeight) * CellSize);
+                        while (SpawnFlag)
+                        {
+                            Rectangle WolfPo = new Rectangle(WolfPoint.X, WolfPoint.Y, CellSize, CellSize);
+                            bool lockalFlag = true;
+                            foreach (Point trap in traps.ToList())
+                            {
+                                Rectangle tr = new Rectangle(trap.X, trap.Y, CellSize, CellSize);
+                                if (tr.IntersectsWith(WolfPo))
+                                {
+                                    lockalFlag = false;
+                                    break;
+                                }
+                            }
+                            if (lockalFlag)
+                            {
+                                Rectangle RabP = new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize);
+                                if (!RabP.IntersectsWith(WolfPo))
+                                {
+                                    SpawnFlag = false;
+                                    continue;
+                                }
+                            }
+                            WolfPoint = new Point(random.Next(0, GridWidth) * CellSize, random.Next(0, GridHeight) * CellSize);
+                        }
+                        Wolf = new Wolf(WolfPoint);
+                        WolfFlag = true;
+                        WolfDead = false;
+                        MoveDurationWolf = (int)(MoveDurationWolf * 0.7);
+                        wolfThread = new Thread(WolfAction) { IsBackground = true };
+                        wolfThread.Start();
+                    }
                 }
             }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Морковки");
+            }
         }
+        private static Random random = new Random();
         private List<Point> wolfPositionHistory = new List<Point>();
         private int MoveDurationWolf = 1000;
         private async void WolfAction()
         {
+
             while (isGameRunning && !cancellationTokenSource.IsCancellationRequested)
             {
                 var MoveStart = DateTime.Now;
-                
+
                 Invoke((MethodInvoker)delegate
                 {
                     Point nextStuff = Wolf.GetMaxSmellNeighbor();
                     var currentTime = DateTime.Now;
 
-                    var elapsed = (currentTime - MoveStart).TotalMilliseconds; 
+                    var elapsed = (currentTime - MoveStart).TotalMilliseconds;
                     Point WolfPosition = new Point();
                     if (elapsed < MoveDurationWolf)
                     {
@@ -519,6 +686,7 @@ namespace WindowsFormsApp1
                     }
                     Wolf.WolfPosition = nextStuff;
                     wolfPositionHistory.Add(Wolf.WolfPosition);
+                    Invalidate(new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize));
                     if (wolfPositionHistory.Count > maxPositionHistoryLength)
                     {
                         wolfPositionHistory.RemoveAt(0);
@@ -536,11 +704,16 @@ namespace WindowsFormsApp1
                 Rectangle RabbitRect = new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize);
                 for (int i = carrots.Count - 1; i >= 0; i--)
                 {
-                    if (WolfRect.IntersectsWith(carrots[i]))
+                    if (i < carrots.Count && i >= 0)
                     {
-                        droped = true;
-                        carrots.RemoveAt(i);
-                        Invalidate(carrots[i]);
+                        Rectangle CarrotPosition = new Rectangle(carrots[i].X, carrots[i].Y, CellSize, CellSize);
+                        if (WolfRect.IntersectsWith(carrots[i]))
+                        {
+                            droped = true;
+                            carrots.RemoveAt(i);
+                            Thread.Sleep(2000);
+                            Invalidate(CarrotPosition);
+                        }
                     }
                 }
 
@@ -553,25 +726,59 @@ namespace WindowsFormsApp1
                     }
                 }
                 Thread.Sleep(MoveDurationWolf);
-                if (WolfRect.IntersectsWith(RabbitRect)) { Invoke((MethodInvoker)GameOver); return; }
+                if (WolfRect.IntersectsWith(RabbitRect))
+                {
+                    Invalidate(RabbitRect);
+                    deadFromWolf = true;
+                    Invoke((MethodInvoker)GameOver);
+                    return;
+                }
             }
+            /*
+             * try
+             {
+             }
+            catch(Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке Активности волка");
+            }*/
         }
-
+        bool deadFromWolf = false;
         private void GameOver()
         {
-            if (gameIsOver) return;
-
-            if (InvokeRequired)
+            try
             {
-                Invoke((MethodInvoker)delegate { GameOver(); });
-                return;
-            }
+                if (gameIsOver) return;
 
-            gameIsOver = true;
-            isMoving = false;
-            isGameRunning = false;
-            MessageBox.Show("К сожалению, игра закончена.");
-            Close();
+                if (InvokeRequired)
+                {
+                    Invoke((MethodInvoker)delegate { GameOver(); });
+                    return;
+                }
+                if (WolfFlag && deadFromWolf)
+                {
+                    Point oldPosition = Wolf.WolfPosition;
+                    if (Wolf.WolfPosition.X % CellSize < (int)(CellSize * 0.6) || Wolf.WolfPosition.Y % CellSize < (int)(CellSize * 0.6))
+                    {
+                        Wolf.WolfPosition = new Point(rabbitPosition.X, rabbitPosition.Y);
+                    }
+                    Invalidate(new Rectangle(oldPosition.X, oldPosition.Y, CellSize, CellSize));
+                    Invalidate(new Rectangle(Wolf.WolfPosition.X, Wolf.WolfPosition.Y, CellSize, CellSize));
+                }
+                Invalidate(new Rectangle(rabbitPosition.X, rabbitPosition.Y, CellSize, CellSize));
+
+                gameIsOver = true;
+                isMoving = false;
+                isGameRunning = false;
+                MessageBox.Show($"К сожалению, игра закончена.\nrabb X: {rabbitPosition.X} Wolf X: {Wolf.WolfPosition.X}\nrabb Y: {rabbitPosition.Y} Wolf Y: {Wolf.WolfPosition.Y}");
+                Close();
+            }
+            catch (Exception a)
+            {
+                Console.WriteLine(a.ToString());
+                MessageBox.Show("Вызвано исключение в блоке GameOver");
+            }
         }
 
 
